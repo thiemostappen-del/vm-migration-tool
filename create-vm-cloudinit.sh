@@ -102,7 +102,7 @@ packages:
 
 runcmd:
   - echo "Starting Migration Tool installation..." > /var/log/migration-tool-install.log
-  - curl -fsSL https://raw.githubusercontent.com/yourrepo/install.sh -o /tmp/install.sh 2>> /var/log/migration-tool-install.log
+  - curl -fsSL https://raw.githubusercontent.com/thiemostappen-del/vm-migration-tool/main/install.sh -o /tmp/install.sh 2>> /var/log/migration-tool-install.log
   - bash /tmp/install.sh >> /var/log/migration-tool-install.log 2>&1
   - systemctl enable vm-migration-tool >> /var/log/migration-tool-install.log 2>&1
   - systemctl start vm-migration-tool >> /var/log/migration-tool-install.log 2>&1
