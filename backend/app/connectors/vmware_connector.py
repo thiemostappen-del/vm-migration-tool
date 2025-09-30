@@ -95,7 +95,7 @@ class VMwareConnector:
             if isinstance(device, vim.vm.device.VirtualDisk):
                 disks.append({
                     'label': device.deviceInfo.label,
-                    'size_gb': device.capacityInBytes / (1024**3),
+                    'size_gb': round(device.capacityInBytes / (1024**3), 2),
                     'type': type(device.backing).__name__,
                     'thin': getattr(device.backing, 'thinProvisioned', False)
                 })
@@ -117,7 +117,7 @@ class VMwareConnector:
             'status': summary.runtime.powerState,
             'cpu_cores': config.hardware.numCPU,
             'memory_mb': config.hardware.memoryMB,
-            'disk_size_gb': sum(d['size_gb'] for d in disks),
+            'disk_size_gb': int(sum(d['size_gb'] for d in disks)),
             'disks': disks,
             'networks': networks,
             'guest_os': config.guestFullName,
