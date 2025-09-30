@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import './App.css';
 import Dashboard from './components/Dashboard';
 import MigrationWizard from './components/MigrationWizard';
