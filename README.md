@@ -11,7 +11,7 @@ Drei Installationsmethoden verfügbar - von **vollautomatisch** bis **manuell**.
 
 ```bash
 # Auf Proxmox-Host ausführen:
-curl -fsSL https://raw.githubusercontent.com/yourrepo/create-vm-cloudinit.sh -o /tmp/deploy.sh
+curl -fsSL https://raw.githubusercontent.com/thiemostappen-del/vm-migration-tool/main/create-vm-cloudinit.sh -o /tmp/deploy.sh
 bash /tmp/deploy.sh 200
 
 # Nach 5 Minuten fertig!
