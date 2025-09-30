@@ -23,6 +23,8 @@ interface Stats {
 const Dashboard: React.FC = () => {
   const [activeJobs, setActiveJobs] = useState<Job[]>([]);
   const [stats, setStats] = useState<Stats>({ completed: 0, running: 0, scheduled: 0 });
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     fetchData();
@@ -32,6 +34,7 @@ const Dashboard: React.FC = () => {
 
   const fetchData = async () => {
     try {
+      setError(null);
       const response = await axios.get(`${API_URL}/api/migrations/`);
       const jobs = response.data;
 
@@ -46,10 +49,31 @@ const Dashboard: React.FC = () => {
         scheduled: jobs.filter((j: Job) => j.status === 'queued').length,
       };
       setStats(stats);
-    } catch (error) {
+      setLoading(false);
+    } catch (error: any) {
       console.error('Failed to fetch jobs:', error);
+      setError('Fehler beim Laden der Daten. Backend erreichbar?');
+      setLoading(false);
     }
   };
+
+  if (loading) {
+    return (
+      <div className="dashboard">
+        <div style={{ padding: '2rem', textAlign: 'center' }}>Lade Dashboard...</div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="dashboard">
+        <div style={{ padding: '2rem', textAlign: 'center', color: '#dc3545' }}>
+          {error}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="dashboard">
