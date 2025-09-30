@@ -9,7 +9,7 @@
 
 ```bash
 # Script herunterladen
-wget https://raw.githubusercontent.com/yourrepo/create-vm-cloudinit.sh
+wget https://raw.githubusercontent.com/thiemostappen-del/vm-migration-tool/main/create-vm-cloudinit.sh
 
 # Ausführen (VM ID 200)
 bash create-vm-cloudinit.sh 200
