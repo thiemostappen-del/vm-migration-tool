@@ -3,7 +3,7 @@
 # VMware to Proxmox Migration Tool - Automated Installer
 # Run this script on a fresh Ubuntu 22.04 VM in Proxmox
 #
-# Usage: curl -fsSL https://raw.githubusercontent.com/yourrepo/install.sh | bash
+# Usage: curl -fsSL https://raw.githubusercontent.com/thiemostappen-del/vm-migration-tool/main/ | bash
 #
 
 set -e
