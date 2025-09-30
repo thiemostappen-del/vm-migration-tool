@@ -1,0 +1,112 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: migration-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: migration_tool
+      POSTGRES_USER: migration_user
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - migration-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U migration_user"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: migration-redis
+    restart: unless-stopped
+    volumes:
+      - redis_data:/data
+    networks:
+      - migration-net
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build: ./backend
+    container_name: migration-backend
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql://migration_user:${DB_PASSWORD}@db:5432/migration_tool
+      REDIS_URL: redis://redis:6379/0
+      SECRET_KEY: ${SECRET_KEY}
+      ENVIRONMENT: production
+    volumes:
+      - ./logs:/app/logs
+    networks:
+      - migration-net
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  celery-worker:
+    build: ./backend
+    container_name: migration-celery-worker
+    restart: unless-stopped
+    command: celery -A app.celery_app worker --loglevel=info --concurrency=2
+    environment:
+      DATABASE_URL: postgresql://migration_user:${DB_PASSWORD}@db:5432/migration_tool
+      REDIS_URL: redis://redis:6379/0
+      SECRET_KEY: ${SECRET_KEY}
+    volumes:
+      - ./logs:/app/logs
+    networks:
+      - migration-net
+    depends_on:
+      - redis
+      - db
+      - backend
+
+  celery-beat:
+    build: ./backend
+    container_name: migration-celery-beat
+    restart: unless-stopped
+    command: celery -A app.celery_app beat --loglevel=info
+    environment:
+      DATABASE_URL: postgresql://migration_user:${DB_PASSWORD}@db:5432/migration_tool
+      REDIS_URL: redis://redis:6379/0
+      SECRET_KEY: ${SECRET_KEY}
+    volumes:
+      - ./logs:/app/logs
+    networks:
+      - migration-net
+    depends_on:
+      - redis
+      - db
+      - backend
+
+  frontend:
+    build: ./frontend
+    container_name: migration-frontend
+    restart: unless-stopped
+    ports:
+      - "3000:80"
+    environment:
+      VITE_API_URL: http://localhost:8000
+    networks:
+      - migration-net
+    depends_on:
+      - backend
+
+volumes:
+  postgres_data:
+  redis_data:
+
+networks:
+  migration-net:
+    driver: bridge

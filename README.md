@@ -1,259 +1,249 @@
 # VMware → Proxmox Migration Tool
-## Installation auf Proxmox
+## Full Stack Application
 
-Drei Installationsmethoden verfügbar - von **vollautomatisch** bis **manuell**.
-
----
-
-## ⚡ Methode 1: Cloud-Init (Empfohlen - 5 Minuten)
-
-**Vollautomatisch - keine manuelle Installation nötig!**
-
-```bash
-# Auf Proxmox-Host ausführen:
-curl -fsSL https://raw.githubusercontent.com/thiemostappen-del/vm-migration-tool/main/create-vm-cloudinit.sh -o /tmp/deploy.sh
-bash /tmp/deploy.sh 200
-
-# Nach 5 Minuten fertig!
-# Zugriff: http://<vm-ip>:3000
-```
-
-**Was passiert automatisch:**
-- ✅ VM wird erstellt
-- ✅ Ubuntu 22.04 installiert
-- ✅ Docker installiert
-- ✅ Migration Tool installiert
-- ✅ Service gestartet
+Intelligente VM-Migration von VMware nach Proxmox mit Web-GUI, automatischer Validierung und Zeitsteuerung.
 
 ---
 
-## 🚀 Methode 2: Manuelle VM + Auto-Install (10 Minuten)
+## 🎯 Features
 
-**Schritt 1:** VM in Proxmox erstellen
-```bash
-# Auf Proxmox-Host:
-bash create-vm.sh 200
+- ✅ Web-basierte GUI
+- ✅ Automatische VM-Migration
+- ✅ Batch-Verarbeitung
+- ✅ Zeitsteuerung (Sofort / Geplant / Wiederkehrend)
+- ✅ 3-stufige Validierung
+- ✅ Live-Fortschrittsanzeige
+- ✅ REST API
+
+---
+
+## 🏗️ Architektur
+
 ```
-
-**Schritt 2:** Ubuntu installieren (via Console)
-- Minimale Installation
-- SSH aktivieren
-- Benutzer: `admin`
-
-**Schritt 3:** Tool installieren
-```bash
-# SSH zur VM:
-ssh admin@<vm-ip>
-
-# Installation:
-sudo su -
-curl -fsSL https://raw.githubusercontent.com/yourrepo/install.sh | bash
+Frontend (React/TypeScript)
+    ↓
+Backend (FastAPI/Python)
+    ↓
+Celery (Async Tasks)
+    ↓
+PostgreSQL + Redis
 ```
 
 ---
 
-## 🔧 Methode 3: Komplett Manuell (30 Minuten)
+## 🚀 Quick Start
 
-Siehe [INSTALLATION.md](INSTALLATION.md) für Details.
+### 1. Repository clonen
+```bash
+git clone https://github.com/thiemostappen-del/vm-migration-tool.git
+cd vm-migration-tool
+```
+
+### 2. Environment konfigurieren
+```bash
+cp .env.example .env
+nano .env  # Passwörter anpassen!
+```
+
+### 3. Starten
+```bash
+docker-compose build
+docker-compose up -d
+```
+
+### 4. Zugriff
+- **Frontend:** http://localhost:3000
+- **API Docs:** http://localhost:8000/docs
+
+---
+
+## 📁 Projektstruktur
+
+```
+vm-migration-tool/
+├── backend/
+│   ├── app/
+│   │   ├── api/              # REST Endpoints
+│   │   ├── connectors/       # VMware & Proxmox APIs
+│   │   ├── services/         # Business Logic
+│   │   ├── tasks/            # Celery Tasks
+│   │   ├── models/           # Database Models
+│   │   └── schemas/          # Pydantic Schemas
+│   ├── Dockerfile
+│   └── requirements.txt
+├── frontend/
+│   ├── src/
+│   │   ├── components/       # React Components
+│   │   ├── App.tsx
+│   │   └── main.tsx
+│   ├── Dockerfile
+│   └── package.json
+└── docker-compose.yml
+```
+
+---
+
+## 🔧 Development
+
+### Backend entwickeln
+```bash
+cd backend
+python -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+uvicorn app.main:app --reload
+```
+
+### Frontend entwickeln
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+---
+
+## 🐳 Docker Commands
 
 ```bash
-# 1. VM erstellen (Proxmox UI oder CLI)
-# 2. Ubuntu 22.04 installieren
-# 3. Manuelle Installation:
-
-sudo apt update && sudo apt upgrade -y
-sudo apt install -y docker.io docker-compose git qemu-utils
-
-sudo mkdir -p /opt/vm-migration-tool
-cd /opt/vm-migration-tool
-
-# Repository clonen
-git clone <repo-url> .
+# Alles bauen
+docker-compose build
 
 # Starten
 docker-compose up -d
-```
-
----
-
-## 📋 Systemanforderungen
-
-| Komponente | Minimum | Empfohlen |
-|------------|---------|-----------|
-| CPU        | 2 Cores | 4 Cores   |
-| RAM        | 4 GB    | 8 GB      |
-| Disk       | 50 GB   | 100 GB    |
-| OS         | Ubuntu 20.04 | Ubuntu 22.04 |
-
----
-
-## 🎯 Nach der Installation
-
-### Zugriff
-- **Web-UI:** `http://<vm-ip>:3000`
-- **API:** `http://<vm-ip>:8000/docs`
-
-### Erste Schritte
-1. Browser öffnen → `http://<vm-ip>:3000`
-2. VMware-Verbindung konfigurieren
-3. Proxmox-Verbindung konfigurieren
-4. Erste VM migrieren!
-
-### Management
-```bash
-# Status prüfen
-systemctl status vm-migration-tool
 
 # Logs anzeigen
-cd /opt/vm-migration-tool
 docker-compose logs -f
 
-# Neustart
-systemctl restart vm-migration-tool
-
 # Stoppen
-systemctl stop vm-migration-tool
-```
+docker-compose down
 
----
+# Neu starten
+docker-compose restart
 
-## 📊 Service-Übersicht
-
-Nach Installation laufen folgende Services:
-
-| Service | Port | Beschreibung |
-|---------|------|--------------|
-| Frontend | 3000 | Web-UI |
-| Backend | 8000 | REST API |
-| PostgreSQL | 5432 | Datenbank (intern) |
-| Redis | 6379 | Message Queue (intern) |
-
----
-
-## 🔐 Sicherheit
-
-### Passwörter ändern
-```bash
-cd /opt/vm-migration-tool
-nano .env
-
-# Ändern:
-DB_PASSWORD=<sicheres-passwort>
-SECRET_KEY=<langer-key>
-```
-
-### Firewall
-```bash
-# Falls UFW aktiv:
-sudo ufw allow 3000/tcp
-sudo ufw allow 8000/tcp
-```
-
-### HTTPS (Optional)
-```bash
-# Nginx Reverse Proxy mit Let's Encrypt
-sudo apt install -y nginx certbot python3-certbot-nginx
-# Konfiguration siehe docs/nginx-ssl.md
-```
-
----
-
-## 🆘 Troubleshooting
-
-### VM startet nicht
-```bash
-# Status prüfen
-systemctl status vm-migration-tool
-
-# Logs
-journalctl -u vm-migration-tool -f
-```
-
-### Docker-Probleme
-```bash
 # Container-Status
 docker-compose ps
-
-# Logs
-docker-compose logs -f backend
-docker-compose logs -f celery-worker
-
-# Neustart
-docker-compose restart
 ```
 
-### Netzwerk-Probleme
-```bash
-# Ports prüfen
-netstat -tulpn | grep -E '3000|8000'
+---
 
-# Docker-Netzwerk prüfen
-docker network inspect vm-migration-tool_migration-net
+## 📊 API Endpoints
+
+### Migrations
+- `POST /api/migrations/` - Neue Migration erstellen
+- `GET /api/migrations/` - Alle Migrationen auflisten
+- `GET /api/migrations/{id}` - Migration Details
+- `DELETE /api/migrations/{id}` - Migration löschen
+
+### VMware
+- `POST /api/vmware/test-connection` - Verbindung testen
+- `POST /api/vmware/list-vms` - VMs auflisten
+
+### Proxmox
+- `POST /api/proxmox/test-connection` - Verbindung testen
+- `POST /api/proxmox/list-nodes` - Nodes auflisten
+- `POST /api/proxmox/list-storage` - Storage auflisten
+
+API-Dokumentation: http://localhost:8000/docs
+
+---
+
+## ⚙️ Konfiguration
+
+### .env Datei
+```env
+DB_PASSWORD=<sicheres-passwort>
+SECRET_KEY=<langer-zufälliger-schlüssel>
+
+# Optional: Default-Verbindungen
+VMWARE_HOST=vcenter.local
+VMWARE_USER=administrator@vsphere.local
+VMWARE_PASSWORD=...
+
+PROXMOX_HOST=proxmox.local
+PROXMOX_USER=root@pam
+PROXMOX_PASSWORD=...
 ```
 
-### Komplett neu starten
+---
+
+## 🧪 Testing
+
 ```bash
-cd /opt/vm-migration-tool
+cd backend
+pytest
+```
+
+---
+
+## 📝 Migration Workflow
+
+1. **Verbindung zu VMware herstellen**
+2. **VMs auswählen** (eine oder mehrere)
+3. **Proxmox-Ziel konfigurieren**
+4. **Hardware-Anpassungen** (optional)
+5. **Zeitplan festlegen**
+6. **Migration starten**
+7. **Validierung** (automatisch)
+8. **Fertig!** ✅
+
+---
+
+## 🔒 Sicherheit
+
+⚠️ **Wichtig:**
+- Passwörter in `.env` sollten verschlüsselt werden
+- HTTPS in Production verwenden
+- Firewall-Regeln anpassen
+- Regelmäßige Updates
+
+---
+
+## 🐛 Troubleshooting
+
+### Backend startet nicht
+```bash
+docker-compose logs backend
+```
+
+### Frontend lädt nicht
+```bash
+docker-compose logs frontend
+```
+
+### Celery Tasks laufen nicht
+```bash
+docker-compose logs celery-worker
+```
+
+### Datenbank-Probleme
+```bash
 docker-compose down -v
 docker-compose up -d
 ```
 
 ---
 
-## 📦 Updates
+## 📖 Weitere Dokumentation
 
-```bash
-cd /opt/vm-migration-tool
-
-# Code aktualisieren
-git pull
-
-# Images neu bauen
-docker-compose build
-
-# Neustart
-docker-compose up -d
-```
+- [Installation Guide](../INSTALLATION.md)
+- [API Documentation](http://localhost:8000/docs)
+- [Architecture](docs/ARCHITECTURE.md)
 
 ---
 
-## 🗑️ Deinstallation
+## 🤝 Contributing
 
-```bash
-# Services stoppen
-systemctl stop vm-migration-tool
-systemctl disable vm-migration-tool
-
-# Dateien löschen
-cd /opt/vm-migration-tool
-docker-compose down -v
-cd ~
-sudo rm -rf /opt/vm-migration-tool
-
-# Systemd Service entfernen
-sudo rm /etc/systemd/system/vm-migration-tool.service
-sudo systemctl daemon-reload
-```
+Pull Requests willkommen!
 
 ---
 
-## 📚 Weitere Dokumentation
+## 📄 License
 
-- [Installation Details](INSTALLATION.md)
-- [API Dokumentation](http://<vm-ip>:8000/docs)
-- [Architektur](ARCHITECTURE.md)
-- [FAQ](FAQ.md)
-
----
-
-## 🎬 Quick Start Video
-
-[Link zu Video-Tutorial einfügen]
+MIT License
 
 ---
 
 ## 💬 Support
 
-- Issues: GitHub Issues
-- Docs: [Dokumentation-Link]
-- Email: support@example.com
+Issues: https://github.com/thiemostappen-del/vm-migration-tool/issues
