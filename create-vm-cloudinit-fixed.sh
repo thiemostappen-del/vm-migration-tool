@@ -1,0 +1,224 @@
+#!/bin/bash
+#
+# VM Migration Tool - Automated VM Creation with Cloud-Init
+# Creates and configures a Ubuntu VM on Proxmox with VGA console
+#
+
+set -e
+
+# Configuration
+VM_ID=${1:-200}
+VM_NAME="migration-tool"
+VM_CORES=4
+VM_MEMORY=8192
+VM_DISK_SIZE=100G
+STORAGE="local-lvm"
+BRIDGE="vmbr0"
+CLOUD_IMAGE_URL="https://cloud-images.ubuntu.com/jammy/current/jammy-server-cloudimg-amd64.img"
+CLOUD_IMAGE="/tmp/jammy-cloudimg.img"
+
+echo "╔═══════════════════════════════════════════════════════╗"
+echo "║   VM Migration Tool - Automated Installation         ║"
+echo "╚═══════════════════════════════════════════════════════╝"
+echo ""
+echo "VM Configuration:"
+echo "  VM ID:      $VM_ID"
+echo "  Name:       $VM_NAME"
+echo "  Cores:      $VM_CORES"
+echo "  Memory:     $VM_MEMORY MB"
+echo "  Disk:       $VM_DISK_SIZE"
+echo "  Network:    $BRIDGE"
+echo ""
+
+# Check if VM exists
+if qm status $VM_ID &>/dev/null; then
+    echo "Error: VM $VM_ID already exists!"
+    echo "Delete it first with: qm destroy $VM_ID"
+    exit 1
+fi
+
+# Download cloud image
+echo "[1/6] Downloading Ubuntu Cloud Image..."
+if [ ! -f "$CLOUD_IMAGE" ]; then
+    wget -q --show-progress -O "$CLOUD_IMAGE" "$CLOUD_IMAGE_URL"
+fi
+echo "✓ Image downloaded"
+
+# Create VM
+echo "[2/6] Creating VM..."
+qm create $VM_ID \
+    --name "$VM_NAME" \
+    --cores $VM_CORES \
+    --memory $VM_MEMORY \
+    --net0 virtio,bridge=$BRIDGE \
+    --ostype l26
+echo "✓ VM created"
+
+# Import disk
+echo "[3/6] Importing disk..."
+qm importdisk $VM_ID "$CLOUD_IMAGE" $STORAGE --format qcow2 > /dev/null 2>&1
+echo "✓ Disk imported"
+
+# Configure VM
+echo "[4/6] Configuring VM..."
+qm set $VM_ID \
+    --scsi0 ${STORAGE}:vm-${VM_ID}-disk-0 \
+    --scsihw virtio-scsi-pci \
+    --boot order=scsi0 \
+    --ide2 ${STORAGE}:cloudinit \
+    --vga std \
+    --serial0 socket
+
+# Resize disk
+qm disk resize $VM_ID scsi0 $VM_DISK_SIZE > /dev/null 2>&1
+echo "✓ VM configured with VGA console"
+
+# Create cloud-init user-data
+echo "[5/6] Setting Cloud-Init parameters..."
+cat > /var/lib/vz/snippets/migration-tool-user.yml << 'EOF'
+#cloud-config
+users:
+  - name: admin
+    sudo: ALL=(ALL) NOPASSWD:ALL
+    shell: /bin/bash
+    ssh_authorized_keys:
+      - ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQC... # Add your key here
+  - name: tcedv
+    sudo: ALL=(ALL) NOPASSWD:ALL
+    shell: /bin/bash
+    groups: sudo,docker
+    lock_passwd: false
+    passwd: $6$rounds=4096$saltsalt$hashedpassword # Change this!
+
+package_update: true
+package_upgrade: true
+packages:
+  - curl
+  - git
+  - docker.io
+  - docker-compose
+
+runcmd:
+  - systemctl start docker
+  - systemctl enable docker
+  - usermod -aG docker tcedv
+  - |
+    cat > /tmp/install-migration-tool.sh << 'INSTALL_EOF'
+    #!/bin/bash
+    set -e
+    exec > /var/log/migration-tool-install.log 2>&1
+    
+    echo "Starting Migration Tool installation..."
+    
+    cd /opt
+    git clone https://github.com/thiemostappen-del/vm-migration-tool.git
+    cd vm-migration-tool
+    
+    # Create .env with secure passwords
+    cat > .env << 'ENV_EOF'
+DB_PASSWORD=$(openssl rand -base64 32)
+SECRET_KEY=$(openssl rand -base64 48)
+VMWARE_HOST=
+VMWARE_USER=
+VMWARE_PASSWORD=
+PROXMOX_HOST=
+PROXMOX_USER=
+PROXMOX_PASSWORD=
+ENV_EOF
+    
+    # Generate actual passwords
+    DB_PASS=$(openssl rand -base64 32)
+    SECRET=$(openssl rand -base64 48)
+    
+    cat > .env << ENV_EOF2
+DB_PASSWORD=$DB_PASS
+SECRET_KEY=$SECRET
+VMWARE_HOST=
+VMWARE_USER=
+VMWARE_PASSWORD=
+PROXMOX_HOST=
+PROXMOX_USER=
+PROXMOX_PASSWORD=
+ENV_EOF2
+    
+    # Build and start
+    docker-compose build
+    docker-compose up -d
+    
+    echo "Migration Tool installation complete!"
+    echo "Access at: http://$(hostname -I | awk '{print $1}'):3000"
+    INSTALL_EOF
+  - chmod +x /tmp/install-migration-tool.sh
+  - nohup /tmp/install-migration-tool.sh &
+
+final_message: "Migration Tool VM is ready. Installation running in background (~5 minutes)"
+EOF
+
+qm set $VM_ID --cicustom "user=local:snippets/migration-tool-user.yml"
+qm set $VM_ID --ipconfig0 ip=dhcp
+echo "✓ Cloud-Init configured"
+
+# Start VM
+echo "[6/6] Starting VM..."
+qm start $VM_ID
+echo "✓ VM started"
+
+# Wait for IP (with timeout)
+echo ""
+echo "Waiting for IP address..."
+for i in {1..60}; do
+    IP=$(qm guest cmd $VM_ID network-get-interfaces 2>/dev/null | grep -oP '(?<="ip-address":")[\d.]+' | grep -v "127.0.0.1" | head -1)
+    if [ -n "$IP" ]; then
+        break
+    fi
+    echo -n "."
+    sleep 2
+done
+echo ""
+
+# Final message
+echo ""
+echo "╔═══════════════════════════════════════════════════════╗"
+echo "║   VM wird automatisch installiert! ⚡                  ║"
+echo "╚═══════════════════════════════════════════════════════╝"
+
+if [ -n "$IP" ]; then
+    echo "VM Details:"
+    echo "  VM ID:      $VM_ID"
+    echo "  Name:       $VM_NAME"
+    echo "  IP:         $IP"
+    echo "  Status:     Installing..."
+    echo ""
+    echo "Installation läuft im Hintergrund (~5 Minuten)."
+    echo ""
+    echo "Installation prüfen:"
+    echo "  ssh tcedv@$IP"
+    echo "  tail -f /var/log/migration-tool-install.log"
+    echo ""
+    echo "Nach Abschluss verfügbar unter:"
+    echo "  http://$IP:3000"
+    echo ""
+    echo "Console öffnen (mit VGA):"
+    echo "  Proxmox UI → VM $VM_ID → Console"
+else
+    echo "VM Details:"
+    echo "  VM ID:      $VM_ID"
+    echo "  Name:       $VM_NAME"
+    echo "  IP:         <in Proxmox UI prüfen>"
+    echo "  Status:     Installing..."
+    echo ""
+    echo "IP-Adresse in Proxmox UI prüfen:"
+    echo "  VM $VM_ID → Summary → IPs"
+    echo ""
+    echo "Oder Console öffnen (mit VGA):"
+    echo "  Proxmox UI → VM $VM_ID → Console"
+    echo "  Login: tcedv"
+    echo "  Dann: hostname -I"
+fi
+
+echo ""
+echo "Status prüfen:"
+echo "  qm status $VM_ID"
+echo "  docker-compose ps (in der VM)"
+echo ""
+echo "Fertig! 🎉"
