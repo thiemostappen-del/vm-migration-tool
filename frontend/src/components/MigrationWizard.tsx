@@ -15,6 +15,7 @@ interface VM {
 const MigrationWizard: React.FC = () => {
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
+  const [vmError, setVmError] = useState<string | null>(null);
   
   // Form state
   const [formData, setFormData] = useState({
@@ -35,7 +36,10 @@ const MigrationWizard: React.FC = () => {
   const handleNext = async () => {
     if (step === 1) {
       // Test VMware connection and load VMs
-      await loadVMs();
+      const success = await loadVMs();
+      if (!success) {
+        return;
+      }
     }
     setStep(step + 1);
   };
@@ -44,8 +48,9 @@ const MigrationWizard: React.FC = () => {
     setStep(step - 1);
   };
 
-  const loadVMs = async () => {
+  const loadVMs = async (): Promise<boolean> => {
     setLoading(true);
+    setVmError(null);
     try {
       const response = await axios.post(`${API_URL}/api/vmware/list-vms`, {
         host: formData.sourceHost,
@@ -53,13 +58,18 @@ const MigrationWizard: React.FC = () => {
         password: formData.sourcePassword,
       });
       setAvailableVMs(response.data);
+      return true;
     } catch (error) {
       console.error('Failed to load VMs:', error);
-      alert('Fehler beim Laden der VMs');
+      setVmError('Fehler beim Laden der VMs. Bitte Zugangsdaten prüfen.');
+      return false;
     } finally {
       setLoading(false);
     }
   };
+
+  const renderVmError = () =>
+    vmError ? <div className="error-message">{vmError}</div> : null;
 
   const toggleVM = (vmName: string) => {
     setFormData({
@@ -142,12 +152,14 @@ const MigrationWizard: React.FC = () => {
               onChange={(e) => setFormData({ ...formData, sourcePassword: e.target.value })}
             />
           </div>
+          {renderVmError()}
         </div>
       )}
 
       {step === 2 && (
         <div className="form-section">
           <h2>VMs auswählen</h2>
+          {renderVmError()}
           {loading ? (
             <div>Lade VMs...</div>
           ) : (
