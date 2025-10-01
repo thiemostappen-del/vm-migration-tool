@@ -118,9 +118,9 @@ if [ -z "$MAC_ADDRESS" ]; then
 fi
 
 # Rebuild the definitive network configuration string preserving the MAC using
-# explicit key/value properties so Proxmox retains both the virtio model and the
-# generated address while honouring bridge and VLAN assignments.
-NET_OPTS="virtio,bridge=$BRIDGE,macaddr=$MAC_ADDRESS"
+# the virtio property so Proxmox keeps the generated address together with the
+# bridge and optional VLAN assignments.
+NET_OPTS="virtio=$MAC_ADDRESS,bridge=$BRIDGE"
 if [ -n "$VLAN_TAG" ]; then
     NET_OPTS+=",tag=$VLAN_TAG"
 fi
@@ -156,12 +156,12 @@ if [ -n "$VLAN_TAG" ] && [[ $NET_CONFIG != *"tag=$VLAN_TAG"* ]]; then
     fi
 fi
 
-if [[ $NET_CONFIG == *"macaddr=$MAC_ADDRESS"* ]] || [[ $NET_CONFIG == *"virtio=$MAC_ADDRESS"* ]]; then
+if [[ $NET_CONFIG == *"virtio=$MAC_ADDRESS"* ]]; then
     EFFECTIVE_MAC="$MAC_ADDRESS"
 else
-    EFFECTIVE_MAC=$(sed -n 's/.*macaddr=\([^,]*\).*/\1/p' <<<"$NET_CONFIG")
+    EFFECTIVE_MAC=$(sed -n 's/^virtio=\([^,]*\).*/\1/p' <<<"$NET_CONFIG")
     if [ -z "$EFFECTIVE_MAC" ]; then
-        EFFECTIVE_MAC=$(sed -n 's/^virtio=\([^,]*\).*/\1/p' <<<"$NET_CONFIG")
+        EFFECTIVE_MAC=$(sed -n 's/.*macaddr=\([^,]*\).*/\1/p' <<<"$NET_CONFIG")
     fi
 fi
 
